@@ -64,7 +64,7 @@ data_dummy['weekday'] = data_dummy['started_at'].dt.weekday
 # creating heatmap
 data3 = data_dummy[['day','weekday','start_lat','start_lng','end_lat','end_lng','trip_time']]
 corr = data3.corr() # correlation matrix, computes the pairwise correlation of columns
-plt.figure(figsize=(20, 20))
+plt.figure(figsize = (20, 20))
 #g = sns.heatmap(corr,annot = True, cmap = "RdYlGn") 
 #sns.pairplot(data3)
 
@@ -72,6 +72,7 @@ plt.figure(figsize=(20, 20))
 data_dummy.head()
 #%%
 # compare casual v member
+# creating subsets
 member = data_dummy[data_dummy['member_casual_member'] == 1] 
 casual = data_dummy[data_dummy['member_casual_casual'] == 1]
 plt.figure(figsize = (20, 20))
@@ -92,14 +93,16 @@ h = ['month','day','weekday','start_lat','start_lng','end_lat','end_lng']
 data4 = final_data.drop(h, axis = 1)
 corr = data4.corr() # calc correlation
 plt.figure(figsize = (20, 20))
-#g = sns.heatmap(corr, annot = True, cmap = "RdYlGn")
+g = sns.heatmap(corr, annot = True, cmap = "RdYlGn")
 #member - docked
+
+
 # %%
 # extracting trip_time as y
 # normalizaing and splitting
 y = final_data['trip_time']
 x = final_data.drop(['trip_time', 'month'], axis = 1)
-# standardize y
+# standardize y (target variable)
 s1 = StandardScaler()
 s1.fit(y.values.reshape(-1, 1)) # computes mean and standard deviation for scaling
 #y reshaped because it's a 1D array, but fit requires 2D 
@@ -109,11 +112,14 @@ y = s1.transform(y.values.reshape(-1, 1))
 # set ratio 0.2,  random state to 7.
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state = 7)
 
-# standardize x_train
+# standardize x_train feature
 s2 = StandardScaler()
 s2.fit(x_train)
 X_train_scale = s2.transform(x_train) 
 X_test_scale = s2.transform(x_test)   
+
+#%%
+#print(final_data.dtypes)
 
 #%%
 lr = linear_model.LinearRegression()
@@ -130,5 +136,39 @@ plt.scatter(range(len(y_test)),s1.inverse_transform(y_pred),label = 'Predict')
 plt.legend()
 plt.show()
 
+#%%
+#linear regression importance
+#bit fuzzy
+features_import = pd.DataFrame(x_train.columns, columns=['feature'])
+features_import['importance'] = lr.coef_[0]
+features_import.sort_values('importance', inplace=True)
+plt.barh(features_import['feature'], features_import['importance'], height = 0.7) 
+for a,b in zip( features_import['importance'],features_import['feature']):
+    plt.text(a + 0.001, b, '%.3f'%float(a))
+plt.show()
 
-# %%
+#%%
+# decision tree
+dc = DecisionTreeRegressor(max_depth = 6)
+dc.fit(x_train,y_train) 
+y_pred = dc.predict(x_test)  
+mse2 = mean_squared_error(y_test, y_pred) 
+rmse2 = np.sqrt(mean_squared_error(y_test, y_pred)) 
+r2=r2_score(y_test, y_pred) 
+print("Test MSE: ",round(mse2, 4))
+print("Test RMSE:  ",round(rmse2, 4))
+print("Test R2 :  ",round(r2, 3))
+
+plt.scatter(range(len(y_test)),s1.inverse_transform(y_test.reshape(-1, 1)),label='True')  #ture v predict
+plt.scatter(range(len(y_test)),s1.inverse_transform(y_pred.reshape(-1, 1)),label='Predict')
+plt.legend()
+plt.show()
+
+#%%
+features_import = pd.DataFrame(x_train.columns, columns=['feature'])
+features_import['importance'] = dc.feature_importances_
+features_import.sort_values('importance', inplace=True)
+plt.barh(features_import['feature'], features_import['importance'], height=0.7) 
+for a,b in zip( features_import['importance'],features_import['feature']):
+    plt.text(a+0.001, b,'%.3f'%float(a))
+plt.show()
