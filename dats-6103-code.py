@@ -3,7 +3,11 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-
+from sklearn.model_selection import train_test_split
+from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 
 # %%
 data = pd.read_csv('202306-capitalbikeshare-tripdata.csv')
@@ -64,3 +68,29 @@ corr= data3.corr() # correlation matrix, computes the pairwise correlation of co
 #g = sns.heatmap(corr,annot = True, cmap = "RdYlGn") 
 #sns.pairplot(data3)
 
+# %%
+data_dummy.head()
+#%%
+# compare casual v member
+member = data_dummy[data_dummy['member_casual_member'] == 1] 
+casual = data_dummy[data_dummy['member_casual_casual'] == 1]
+plt.figure(figsize = (20, 20))
+plt.subplot(1,2,1)
+plt.title('member')
+
+sns.histplot(data = member, x = 'day' , bins = 10) 
+plt.subplot(1,2,2)
+plt.title('casual')
+sns.histplot(data = casual, x = 'day' , bins = 10) 
+# %%
+#plucking unwanted cols
+final_data = data_dummy.drop(['started_at', 'ended_at'], axis = 1)
+final_data.head()
+
+# %%
+h = ['month','day','weekday','start_lat','start_lng','end_lat','end_lng']
+data4 = final_data.drop(h, axis = 1)
+corr = data4.corr() # calc correlation
+plt.figure(figsize = (20, 20))
+#g = sns.heatmap(corr, annot = True, cmap = "RdYlGn")
+#member - docked
