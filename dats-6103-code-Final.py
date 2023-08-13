@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -34,7 +34,7 @@ data1['ended_at']=pd.to_datetime(data1['ended_at'])
 #print(data1['started_at'])
 # %%
 # calc trip time (in seconds)
-data1['trip_time']=(data1['ended_at']-data1['started_at']).dt.seconds 
+data1['trip_time'] = (data1['ended_at'] - data1['started_at']).dt.seconds 
 data1.head()
 
 # %%
@@ -50,10 +50,17 @@ plt.pie(y1, labels=x2, autopct='%1.1f%%') # to show in percentage
 plt.show()
 
 # %%
-#one-hot encoding
+
+#**New Stuff**
 column = ['rideable_type','member_casual']
-data_dummy = pd.get_dummies(data2, columns = column, prefix = column, prefix_sep = "_") #convertig into dummy variables
-data_dummy.head()
+data_dummy=data2.copy()
+for col in column:
+    label_encoder = LabelEncoder()
+    label_encoder.fit(data_dummy[col].values.reshape(-1,1))
+    data_dummy[col] = label_encoder.transform(data_dummy[col].values.reshape(-1,1))
+
+#data_dummy.head()
+
 # %%
 # extracting month and day from started_at
 data_dummy['month'] = data_dummy['started_at'].dt.month
@@ -61,21 +68,20 @@ data_dummy['day'] = data_dummy['started_at'].dt.day
 # assigning day of week (0 as Monday)
 data_dummy['weekday'] = data_dummy['started_at'].dt.weekday
 #%%
-# creating heatmap
+# *new stuff*
 data3 = data_dummy[['day','weekday','start_lat','start_lng','end_lat','end_lng','trip_time']]
-corr = data3.corr() # correlation matrix, computes the pairwise correlation of columns
-plt.figure(figsize = (20, 20))
-g = sns.heatmap(corr,annot = True, cmap = "RdYlGn") 
+corr = data3.corr()
+plt.figure(figsize=(10,5))
+#g = sns.heatmap(corr,annot=True,cmap="RdYlGn")
 #sns.pairplot(data3)
 
-# %%
-data_dummy.head()
+
 #%%
-# compare casual v member
+# compare casual v member in day
 # creating subsets
-member = data_dummy[data_dummy['member_casual_member'] == 1] 
-casual = data_dummy[data_dummy['member_casual_casual'] == 1]
-plt.figure(figsize = (20, 20))
+member = data_dummy[data_dummy['member_casual'] == 1] 
+casual = data_dummy[data_dummy['member_casual'] == 0]
+plt.figure(figsize = (20, 10))
 plt.subplot(1,2,1)
 plt.title('member')
 
@@ -83,91 +89,100 @@ sns.histplot(data = member, x = 'day' , bins = 10)
 plt.subplot(1,2,2)
 plt.title('casual')
 sns.histplot(data = casual, x = 'day' , bins = 10) 
+
+plt.figure(figsize = (20, 10))
+plt.subplot(1,2,1)
+plt.title('member')
+
+sns.histplot(data = member, x = 'weekday' , bins = 10) 
+plt.subplot(1,2,2)
+plt.title('casual')
+sns.histplot(data = casual, x = 'weekday' , bins = 10) 
 # %%
 #plucking unwanted cols
 final_data = data_dummy.drop(['started_at', 'ended_at'], axis = 1)
-final_data.head()
+final_data.info()
 
-# %%
-h = ['month','day','weekday','start_lat','start_lng','end_lat','end_lng']
-data4 = final_data.drop(h, axis = 1)
-corr = data4.corr() # calc correlation
-plt.figure(figsize = (20, 20))
-g = sns.heatmap(corr, annot = True, cmap = "RdYlGn")
+#%%
+feature = ['month','day','weekday','start_lat','start_lng','end_lat','end_lng']
+data4 = final_data.drop(feature, axis = 1)
+corr = data4.corr() 
+plt.figure(figsize = (10, 10))
+g=sns.heatmap(corr, annot = True, cmap = "RdYlGn")
+
+#%%
+
+#Linear Model
+x = final_data.drop(['trip_time', 'month','rideable_type','member_casual'], axis = 1)
+y = final_data['trip_time']
+s1 = StandardScaler()
+s1.fit(y.values.reshape(-1, 1))
+y = s1.transform(y.values.reshape(-1, 1))
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state = 7)
+s = StandardScaler()
+s.fit(x_train)
+X_train_scale = s.transform(x_train)  
+X_test_scale = s.transform(x_test)   
 #member - docked
 
-
 # %%
-# extracting trip_time as y
 # normalizaing and splitting
-y = final_data['trip_time']
-x = final_data.drop(['trip_time', 'month'], axis = 1)
-# standardize y (target variable)
-s1 = StandardScaler()
-s1.fit(y.values.reshape(-1, 1)) # computes mean and standard deviation for scaling
-# y reshaped because it's a 1D array, but fit requires 2D 
-y = s1.transform(y.values.reshape(-1, 1))
-
-# split the feature data x and target value y into training and test sets
-# set ratio 0.2,  random state to 7.
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state = 7)
-
-# standardize x_train feature
-s2 = StandardScaler()
-s2.fit(x_train)
-X_train_scale = s2.transform(x_train) 
-X_test_scale = s2.transform(x_test)   
-
-#%%
-#print(final_data.dtypes)
-
-#%%
 lr = linear_model.LinearRegression()
-lr.fit(X_train_scale, y_train)
-y_pred = lr.predict(X_test_scale)  #model prediction
-mse1 = mean_squared_error(y_test, y_pred) # calc mse
-rmse1 = np.sqrt(mean_squared_error(y_test, y_pred)) #rmse
+lr.fit(X_train_scale,y_train) 
+y_pred = lr.predict(X_test_scale) 
+mse = mean_squared_error(y_test, y_pred) 
+rmse = np.sqrt(mean_squared_error(y_test, y_pred)) 
 r2 = r2_score(y_test, y_pred) 
-print("Test MSE: ", round(mse1, 4))
-print("Test RMSE:  ", round(rmse1, 4))
-print("Test R2 :  ", round(r2,3))
-plt.scatter(range(len(y_test)),s1.inverse_transform(y_test),label = 'True')  # true v predict
+print("Test MSE: ",round(mse,4))
+print("Test RMSE:  ",round(rmse,4))
+print("Test R2 :  ",round(r2,3))
+plt.scatter(range(len(y_test)),s1.inverse_transform(y_test),label = 'True')  #绘制真实值和预测值的分布散点图
 plt.scatter(range(len(y_test)),s1.inverse_transform(y_pred),label = 'Predict')
 plt.legend()
 plt.show()
 
 #%%
-#linear regression importance
-#bit fuzzy
 features_import = pd.DataFrame(x_train.columns, columns=['feature'])
 features_import['importance'] = lr.coef_[0]
 features_import.sort_values('importance', inplace=True)
-plt.barh(features_import['feature'], features_import['importance'], height = 0.7) 
+plt.barh(features_import['feature'], features_import['importance'], height=0.7) 
 for a,b in zip( features_import['importance'],features_import['feature']):
-    plt.text(a + 0.001, b, '%.3f'%float(a))
+    plt.text(a+0.001, b,'%.3f'%float(a))
 plt.show()
 
 #%%
 # decision tree
+x = final_data.drop(['trip_time', 'month'], axis = 1)
+y = final_data['trip_time']
+s1 = StandardScaler()
+s1.fit(y.values.reshape(-1, 1))
+y = s1.transform(y.values.reshape(-1, 1))
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=7)
+s = StandardScaler()
+s.fit(x_train)
+X_train_scale = s.transform(x_train) 
+X_test_scale = s.transform(x_test)  
+
+#%%
 dc = DecisionTreeRegressor(max_depth = 6)
 dc.fit(x_train,y_train) 
 y_pred = dc.predict(x_test)  
-mse2 = mean_squared_error(y_test, y_pred) 
-rmse2 = np.sqrt(mean_squared_error(y_test, y_pred)) 
-r2=r2_score(y_test, y_pred) 
-print("Test MSE: ",round(mse2, 4))
-print("Test RMSE:  ",round(rmse2, 4))
-print("Test R2 :  ",round(r2, 3))
+mse = mean_squared_error(y_test, y_pred) 
+rmse = np.sqrt(mean_squared_error(y_test, y_pred)) 
+r2 = r2_score(y_test, y_pred) 
+print("Test MSE: ",round(mse,4))
+print("Test RMSE:  ",round(rmse,4))
+print("Test R2 :  ",round(r2,3))
 
-plt.scatter(range(len(y_test)),s1.inverse_transform(y_test.reshape(-1, 1)),label='True')  #ture v predict
-plt.scatter(range(len(y_test)),s1.inverse_transform(y_pred.reshape(-1, 1)),label='Predict')
+plt.scatter(range(len(y_test)),s1.inverse_transform(y_test.reshape(-1, 1)),label = 'True')  #绘制真实值和预测值的分布散点图
+plt.scatter(range(len(y_test)),s1.inverse_transform(y_pred.reshape(-1, 1)),label = 'Predict')
 plt.legend()
 plt.show()
 
 #%%
 features_import = pd.DataFrame(x_train.columns, columns=['feature'])
 features_import['importance'] = dc.feature_importances_
-features_import.sort_values('importance', inplace=True)
+features_import.sort_values('importance', inplace = True)
 plt.barh(features_import['feature'], features_import['importance'], height=0.7) 
 for a,b in zip( features_import['importance'],features_import['feature']):
     plt.text(a+0.001, b,'%.3f'%float(a))
