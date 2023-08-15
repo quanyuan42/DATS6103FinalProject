@@ -167,8 +167,8 @@ plt.show()
 #%%
 features_import = pd.DataFrame(x_train.columns, columns=['feature'])
 features_import['importance'] = dc.feature_importances_
-features_import.sort_values('importance', inplace=True)
-plt.barh(features_import['feature'], features_import['importance'], height=0.7) 
+features_import.sort_values('importance', inplace = True)
+plt.barh(features_import['feature'], features_import['importance'], height = 0.7) 
 for a,b in zip( features_import['importance'],features_import['feature']):
-    plt.text(a+0.001, b,'%.3f'%float(a))
+    plt.text(a + 0.001, b,'%.3f'%float(a))
 plt.show()
